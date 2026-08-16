@@ -89,7 +89,6 @@
   display:flex;
   flex-direction:column;
   position:relative;
-  overflow:hidden; /* o modal em si nunca cresce: só a lista rola (ver .cconn-picker-list) */
 }
 
 .cconn-picker-close{
@@ -134,15 +133,6 @@
   display:flex;
   flex-direction:column;
   gap:8px;
-  /* CAUSA DO BUG DO MODAL "CRESCENDO": sem flex-basis 0 + min-height 0,
-     um filho flex com overflow-y:auto nunca encolhe abaixo da altura do
-     seu próprio conteúdo — então, ao trocar de categoria, em vez de
-     rolar dentro desta lista, era a caixa do modal inteira (.cconn-picker-box)
-     que ia sendo empurrada para baixo do seu max-height a cada clique.
-     Com flex:1 1 0 + min-height:0, a lista passa a ocupar exatamente o
-     espaço restante do modal e rolar internamente. */
-  flex:1 1 0;
-  min-height:0;
 }
 
 .cconn-picker-row{
@@ -153,14 +143,6 @@
   border:1px solid var(--line);
   border-left:3px solid var(--cx-c, var(--line));
   padding:8px 10px;
-  cursor:pointer; /* a linha inteira (fora dos botões) abre a descrição/detalhes */
-  transition:border-color 0.15s ease;
-}
-.cconn-picker-row:hover{
-  border-color:var(--amber-bright);
-}
-.cconn-picker-row button{
-  cursor:pointer; /* garante que os botões não herdem nenhum estilo "desabilitado" visual da linha */
 }
 
 .cconn-picker-row-body{
@@ -221,143 +203,104 @@
   padding:14px 0;
 }
 
-/* ---------- Personalizadas: filtro sintético (cor própria, não é
-   uma dimensão oficial do Compêndio, então não existe em index.html) ---------- */
-.cx-personalizada{ --cx-c:#e0913c; --cx-c-dim:#8a5620; }
-.cconn-block.cx-personalizada{ cursor:default; } /* sem modal de detalhes oficial para abrir */
+/* ==========================================================
+   CONEXÕES DA FICHA — ETAPA 3 (PERSONALIZADAS)
+   Bloco isolado, adicionado ao final do arquivo. Não redefine
+   nenhuma regra da Etapa 2 acima nem nada do Compêndio (.cx-*
+   oficiais) — só soma a variante de cor "personalizada" (mesmo
+   padrão --cx-c/--cx-c-dim das demais Dimensões) e as classes
+   novas do picker, do formulário e das ações do modal de detalhes.
+   ========================================================== */
 
-/* ---------- Personalizadas: botão "+ Criar Personalizada" ---------- */
-.cconn-custom-toolbar{
-  margin:0 0 10px;
-  flex:0 0 auto;
-}
-.cconn-custom-create-btn{
-  background:transparent;
-  border:1px dashed var(--cx-c, var(--sigil));
-  color:var(--paper);
-  font-family:'Oswald',sans-serif;
-  font-size:10.5px;
-  text-transform:uppercase;
-  letter-spacing:0.06em;
-  padding:8px 13px;
-  cursor:pointer;
+/* Cor da categoria Personalizadas — tom dourado (--amber-bright),
+   reforçando que a Personalizada "parece uma conexão oficial"
+   dentro da mesma interface. */
+.cx-personalizada{--cx-c:#f0a83c; --cx-c-dim:#8f5f18;}
+
+/* ---------- linha "+ Criar Conexão Personalizada" no picker ---------- */
+.cconn-picker-create-btn{
+  display:block;
   width:100%;
+  text-align:center;
+  background:rgba(240,168,60,0.10);
+  border:1px dashed var(--amber-bright);
+  color:var(--paper);
+  padding:10px 12px;
+  margin-bottom:8px;
+  font-size:11px;
 }
-.cconn-custom-create-btn:hover{
-  border-color:var(--amber-bright);
-  color:var(--amber-bright);
+.cconn-picker-create-btn:hover{
+  background:rgba(240,168,60,0.18);
+  border-style:solid;
 }
 
-/* ---------- Personalizadas: linha na lista do picker ---------- */
-.cconn-picker-row.cconn-custom-row{
-  align-items:flex-start;
+/* linha da lista referente a uma Personalizada: clicável (abre o
+   modal de detalhes), diferente das linhas oficiais */
+.cconn-picker-row.is-clickable{
+  cursor:pointer;
 }
+.cconn-picker-row.is-clickable:hover{
+  border-color:var(--amber-bright);
+}
+
 .cconn-custom-badge{
   display:inline-block;
-  font-size:9px;
-  letter-spacing:0.05em;
+  font-size:8.5px;
+  letter-spacing:0.08em;
   text-transform:uppercase;
   color:var(--cx-c, var(--amber-bright));
-  border:1px solid var(--cx-c, var(--amber-bright));
-  padding:1px 5px;
+  border:1px solid var(--cx-c-dim, var(--amber));
+  padding:1px 6px;
   margin-left:6px;
-  border-radius:2px;
+  font-family:'Oswald',sans-serif;
   vertical-align:middle;
 }
-.cconn-custom-desc{
-  font-size:11.5px;
-  line-height:1.5;
-  color:var(--paper-dim, var(--paper));
-  margin-top:6px;
-  white-space:pre-line; /* preserva quebras de linha sem truncar/cortar texto */
-}
-.cconn-custom-obs{
-  font-size:10.5px;
-  line-height:1.5;
-  color:var(--sigil);
-  margin-top:6px;
-  white-space:pre-line;
-}
-.cconn-picker-row-actions{
-  display:flex;
-  flex-direction:column;
-  align-items:stretch;
-  gap:6px;
-  flex:0 0 auto;
-}
-.cconn-custom-edit-btn,
-.cconn-custom-del-btn{
-  background:transparent;
-  border:1px solid var(--line);
-  color:var(--sigil);
-  font-size:10.5px;
-  padding:5px 10px;
-  cursor:pointer;
-  white-space:nowrap;
-}
-.cconn-custom-edit-btn:hover{ color:var(--paper); border-color:var(--amber-bright); }
-.cconn-custom-del-btn:hover{ color:#e0605a; border-color:#e0605a; }
 
-/* ---------- Modal "Criar/Editar Personalizada" ---------- */
-.cconn-custom-form-box{
-  max-width:520px;
+/* botão "Detalhes" das Personalizadas em Minhas Conexões — mesmo
+   estilo do botão "Remover" já existente (.entry-del) */
+.cconn-entry-card .entry-del + .entry-del{
+  margin-left:6px;
+}
+
+/* ---------- formulário "Criar / Editar Conexão Personalizada" ---------- */
+.cconn-form-box{
+  max-width:480px;
   width:100%;
   text-align:left;
-  max-height:86vh;
-  overflow-y:auto;
   position:relative;
 }
-.cconn-custom-form-box .field{
-  flex-direction:column;
-  align-items:stretch;
-  gap:4px;
+.cconn-form-field{
+  display:block;
   margin-bottom:14px;
 }
-.cconn-custom-form-box .field label{ white-space:normal; }
-.cconn-custom-form-actions{
+.cconn-form-field label{
+  display:block;
+  margin-bottom:6px;
+}
+.cconn-form-field-desc textarea{
+  min-height:120px;
+}
+.cconn-form-err{
+  font-size:11px;
+  color:#e06060;
+  margin:-6px 0 14px;
+}
+.cconn-form-actions{
   display:flex;
   justify-content:flex-end;
   gap:10px;
   margin-top:6px;
 }
-.cconn-custom-del-form-btn{
-  margin-right:auto;
-  background:transparent;
-  border:1px solid #e0605a;
-  color:#e0605a;
-}
-.cconn-custom-del-form-btn:hover{ background:rgba(224,96,90,0.12); }
 
-/* ---------- Modal "Ver Personalizada" (equivalente ao modal de
-   detalhes do Compêndio, para entradas que não estão em CONEXOES_DATA) ---------- */
-.cconn-custom-view-box{
-  max-width:520px;
-  width:100%;
-  text-align:left;
-  max-height:86vh;
-  overflow-y:auto;
-  position:relative;
-}
-.cconn-custom-view-box h3{
-  margin:0 0 4px;
-  padding-right:30px;
-  font-family:'Oswald',sans-serif;
-  font-size:16px;
-  text-transform:uppercase;
-  letter-spacing:0.06em;
-  color:var(--amber-bright);
-}
-.cconn-custom-view-box .cx-modal-dim{
-  margin-bottom:14px;
-}
-.cconn-custom-view-box .modal-actions{
+/* ---------- ações extras no modal de detalhes (só Personalizadas) ---------- */
+.cconn-modal-actions{
   display:flex;
   flex-wrap:wrap;
   gap:10px;
-  justify-content:flex-start;
+  margin-top:16px;
+  padding-top:16px;
+  border-top:1px solid var(--line);
 }
-.cconn-custom-view-box #ccv_delete{
-  border-color:#e0605a;
-  color:#e0605a;
+.cconn-modal-actions button{
+  flex:1 1 auto;
 }
-.cconn-custom-view-box #ccv_delete:hover{ background:rgba(224,96,90,0.12); }
