@@ -30,116 +30,6 @@
   var HIDDEN_FIELD_ID = "agente_conexoes_ids";
   var pickerActiveFilter = "todas";
 
-  // true só entre o clique numa linha do picker e a próxima chamada de
-  // openConexaoModal() — é como o modal de detalhes do Compêndio "sabe"
-  // que foi aberto a partir do fluxo de adicionar à ficha, e não da
-  // navegação normal do Compêndio ou do clique em Agentes → Conexão
-  // (nesses dois casos o botão de Adicionar/Remover continua escondido,
-  // exatamente como sempre foi).
-  var cxModalPickerContext = false;
-
-  /* ==========================================================
-     PERSONALIZADAS
-     Conteúdo criado pelo próprio usuário (Conexão/Habilidade/
-     Técnica/Outro). NÃO entra em CONEXOES_DATA — é uma camada
-     separada, guardada com a MESMA infraestrutura de storage que
-     Inventário e Paranormal já usam (storageGet/storageSet,
-     definidas no index.html), só que numa chave própria:
-     "conexoes:personalizadas". Nenhum localStorage/API novo.
-
-     Uma personalizada adicionada a uma ficha usa a mesma lista de
-     referências (#agente_conexoes_ids) que as Conexões oficiais já
-     usam — só que a referência tem o prefixo "custom:" + id, em vez
-     do nome, porque nomes de personalizadas não são garantidamente
-     únicos. findConnByRef() reconhece esse prefixo e resolve para a
-     personalizada certa; todo o resto (dedupe, remover, persistência
-     por ficha, duplicação de ficha) continua sendo o mesmo mecanismo
-     de sempre, sem nenhuma alteração.
-     ========================================================== */
-
-  var PERSONALIZADAS_KEY = "conexoes:personalizadas";
-  var CUSTOM_REF_PREFIX = "custom:";
-  var CUSTOM_TIPOS = ["Conexão", "Habilidade", "Técnica", "Outro"];
-  var personalizadas = [];
-  var personalizadasLoaded = false;
-
-  function genCustomId(){
-    return "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-  }
-
-  async function loadPersonalizadas(){
-    if(typeof storageGet !== "function") { personalizadasLoaded = true; return; }
-    try{
-      var raw = await storageGet(PERSONALIZADAS_KEY);
-      var arr = raw ? JSON.parse(raw) : [];
-      personalizadas = Array.isArray(arr) ? arr : [];
-    }catch(e){
-      personalizadas = [];
-    }
-    personalizadasLoaded = true;
-  }
-
-  async function savePersonalizadas(){
-    if(typeof storageSet !== "function") return;
-    await storageSet(PERSONALIZADAS_KEY, JSON.stringify(personalizadas));
-  }
-
-  // Converte o registro salvo (nome, tipo, etiqueta, desc, obs, id) para
-  // o mesmo "formato de entrada" usado pelas Conexões oficiais (n, d, dl),
-  // para que dimLabel()/symSrc()/os cards reaproveitem o código já existente
-  // sem precisar de um caminho de renderização paralelo.
-  function toCustomEntry(p){
-    return {
-      n: p.n, d: "personalizada", dl: "Personalizada",
-      custom: true, id: p.id, tipo: p.tipo, etiqueta: p.etiqueta,
-      desc: p.desc, obs: p.obs
-    };
-  }
-
-  function getPersonalizadas(){
-    return personalizadas.map(toCustomEntry);
-  }
-
-  function findPersonalizadaRaw(id){
-    for(var i = 0; i < personalizadas.length; i++){
-      if(personalizadas[i].id === id) return personalizadas[i];
-    }
-    return null;
-  }
-
-  async function upsertPersonalizada(data, editId){
-    if(editId){
-      var existing = findPersonalizadaRaw(editId);
-      if(!existing) return null;
-      existing.n = data.n; existing.tipo = data.tipo;
-      existing.etiqueta = data.etiqueta; existing.desc = data.desc; existing.obs = data.obs;
-      await savePersonalizadas();
-      return existing;
-    }
-    var novo = {
-      id: genCustomId(), n: data.n, tipo: data.tipo,
-      etiqueta: data.etiqueta, desc: data.desc, obs: data.obs
-    };
-    personalizadas.push(novo);
-    await savePersonalizadas();
-    return novo;
-  }
-
-  // Exclui a personalizada do "catálogo" (conexoes:personalizadas) e também
-  // remove a referência dela de QUALQUER ficha que a tenha adicionado —
-  // sem isso, a ficha ficaria com uma referência "órfã" (mesmo tratamento
-  // que já existe para uma Conexão oficial renomeada/removida, só que aqui
-  // limpamos ativamente em vez de só exibir "não encontrada").
-  async function deletePersonalizada(id){
-    personalizadas = personalizadas.filter(function(p){ return p.id !== id; });
-    await savePersonalizadas();
-    var ref = CUSTOM_REF_PREFIX + id;
-    var refs = getConnRefs();
-    if(refs.indexOf(ref) !== -1){
-      setConnRefs(refs.filter(function(r){ return r !== ref; }));
-    }
-  }
-
   /* ---------- acesso ao campo oculto (fonte única de verdade da ficha) ---------- */
 
   function ensureHiddenField(){
@@ -186,10 +76,6 @@
   }
 
   function findConnByRef(ref){
-    if(typeof ref === "string" && ref.indexOf(CUSTOM_REF_PREFIX) === 0){
-      var raw = findPersonalizadaRaw(ref.slice(CUSTOM_REF_PREFIX.length));
-      return raw ? toCustomEntry(raw) : null;
-    }
     if(typeof CONEXOES_DATA === "undefined") return null;
     for(var i = 0; i < CONEXOES_DATA.length; i++){
       if(CONEXOES_DATA[i].n === ref) return CONEXOES_DATA[i];
@@ -232,9 +118,6 @@
   }
 
   function dimLabel(c){
-    if(c.custom){
-      return c.tipo + (c.etiqueta ? " · " + c.etiqueta : "");
-    }
     if(typeof CONEXOES_DIM_LABELS !== "undefined"){
       return c.d === "tecnica" ? "Técnica de Aborto Límbico" : (CONEXOES_DIM_LABELS[c.d] || c.dl || "");
     }
@@ -294,9 +177,7 @@
         card.innerHTML =
           thumbHtml +
           '<div class="entry-body">' +
-            '<div class="entry-title">' + esc(c.n) + ' <span class="meta">' + esc(dimLabel(c)) + '</span>' +
-              (c.custom ? ' <span class="cconn-custom-badge">Personalizada</span>' : '') +
-            '</div>' +
+            '<div class="entry-title">' + esc(c.n) + ' <span class="meta">' + esc(dimLabel(c)) + '</span></div>' +
           '</div>' +
           '<button class="entry-del" type="button" data-cconn-remove="' + esc(ref) + '">Remover</button>';
       } else {
@@ -364,17 +245,13 @@
 
       var blockThumbSrc = c ? symSrc(c) : null;
       block.innerHTML = c
-        ? ((blockThumbSrc ? ('<img class="cconn-thumb-sm" src="' + blockThumbSrc + '" alt="">') : '') +
-           '<span>' + esc(c.n) + (c.custom ? ' <span class="cconn-custom-badge">P</span>' : '') + '</span>')
+        ? ((blockThumbSrc ? ('<img class="cconn-thumb-sm" src="' + blockThumbSrc + '" alt="">') : '') + '<span>' + esc(c.n) + '</span>')
         : ('<span>' + esc(ref) + '</span>');
 
       // Preparado para a Etapa 3: já reaproveita o modal de detalhes
       // do próprio Compêndio (sem alterá-lo) para abrir a ficha
-      // completa da Conexão ao clicar. Personalizadas não existem em
-      // CONEXOES_DATA, então não têm esse modal — permanecem só como
-      // bloco informativo aqui (a descrição completa fica visível no
-      // picker, dentro do filtro "Personalizadas").
-      if(c && !c.custom && typeof openConexaoModal === "function" && typeof CONEXOES_DATA !== "undefined"){
+      // completa da Conexão ao clicar.
+      if(c && typeof openConexaoModal === "function" && typeof CONEXOES_DATA !== "undefined"){
         block.addEventListener("click", function(){
           openConexaoModal(CONEXOES_DATA.indexOf(c));
         });
@@ -409,9 +286,6 @@
         '<div class="field cconn-picker-search-row"><label>Pesquisar</label>' +
           '<input type="text" id="cconn_picker_search" placeholder="Nome da Conexão…"></div>' +
         '<div id="cconn_picker_filters" class="cx-filters"></div>' +
-        '<div class="cconn-custom-toolbar">' +
-          '<button type="button" id="cconn_custom_create_btn" class="cconn-custom-create-btn">+ Criar Personalizada</button>' +
-        '</div>' +
         '<div id="cconn_picker_count" class="note cconn-picker-count"></div>' +
         '<div id="cconn_picker_list" class="cconn-picker-list"></div>' +
       '</div>';
@@ -420,10 +294,6 @@
     document.getElementById("cconn_picker_close").addEventListener("click", closePickerModal);
     overlay.addEventListener("click", function(e){
       if(e.target.id === "cconn_picker_modal") closePickerModal();
-    });
-
-    document.getElementById("cconn_custom_create_btn").addEventListener("click", function(){
-      openCustomFormModal(null);
     });
 
     var searchEl = document.getElementById("cconn_picker_search");
@@ -441,10 +311,6 @@
       var label = key === "tecnica" ? "Técnicas de Aborto Límbico" : CONEXOES_DIM_LABELS[key];
       html += '<button type="button" class="cx-filter-btn cx-' + key + '" data-filter="' + key + '"><span class="dot"></span>' + esc(label) + '</button>';
     });
-    // "Personalizadas" não é uma dimensão do Compêndio oficial (não está em
-    // CONEXOES_DIM_ORDER) — é só mais um botão de filtro, construído do
-    // mesmo jeito que os demais, reaproveitando a mesma lista/mesmo clique.
-    html += '<button type="button" class="cx-filter-btn cx-personalizada" data-filter="personalizada"><span class="dot"></span>Personalizadas</button>';
     wrap.innerHTML = html;
     wrap.dataset.built = "1";
 
@@ -466,11 +332,7 @@
     var searchEl = document.getElementById("cconn_picker_search");
     var q = ((searchEl && searchEl.value) || "").toLowerCase().trim();
 
-    // "Todas" mistura o Compêndio oficial (CONEXOES_DATA, intocado) com as
-    // Personalizadas (array separado, nunca gravado dentro de CONEXOES_DATA)
-    // só na hora de montar esta lista de seleção — nenhuma das duas fontes
-    // é alterada pela outra.
-    var items = CONEXOES_DATA.concat(getPersonalizadas());
+    var items = CONEXOES_DATA;
     if(pickerActiveFilter !== "todas"){
       items = items.filter(function(c){ return c.d === pickerActiveFilter; });
     }
@@ -478,8 +340,7 @@
       items = items.filter(function(c){
         return c.n.toLowerCase().indexOf(q) !== -1 ||
                ((CONEXOES_DIM_LABELS && CONEXOES_DIM_LABELS[c.d]) || "").toLowerCase().indexOf(q) !== -1 ||
-               (c.dl || "").toLowerCase().indexOf(q) !== -1 ||
-               (c.etiqueta || "").toLowerCase().indexOf(q) !== -1;
+               (c.dl || "").toLowerCase().indexOf(q) !== -1;
       });
     }
 
@@ -493,14 +354,13 @@
     var currentRefs = getConnRefs();
     list.innerHTML = "";
     items.forEach(function(c){
-      var ref = c.custom ? (CUSTOM_REF_PREFIX + c.id) : c.n;
-      var inSheet = currentRefs.indexOf(ref) !== -1;
+      var inSheet = currentRefs.indexOf(c.n) !== -1;
       // Exceção obrigatória: Aborto Límbico aparece no Compêndio (dentro
       // de Conexões Superiores) mas nunca pode ser adicionado à ficha
       // como Conexão — ele já possui seu próprio sistema em Agentes.
       var blocked = c.noAdd === true;
       var row = document.createElement("div");
-      row.className = "cconn-picker-row cx-" + c.d + (c.custom ? " cconn-custom-row" : "");
+      row.className = "cconn-picker-row cx-" + c.d;
       var rowThumbSrc = symSrc(c);
       var rowThumbHtml = rowThumbSrc ? ('<img class="cconn-thumb-sm" src="' + rowThumbSrc + '" alt="">') : '';
       var btnHtml = blocked
@@ -508,61 +368,19 @@
         : ('<button type="button" class="cconn-picker-add-btn' + (inSheet ? ' in-sheet' : '') + '">' +
             (inSheet ? '✓ Na Ficha' : 'Adicionar') +
           '</button>');
-
-      var bodyHtml =
+      row.innerHTML =
+        rowThumbHtml +
         '<div class="cconn-picker-row-body">' +
-          '<div class="cconn-picker-row-title">' + esc(c.n) +
-            (c.custom ? ' <span class="cconn-custom-badge">Personalizada</span>' : '') +
-          '</div>' +
+          '<div class="cconn-picker-row-title">' + esc(c.n) + '</div>' +
           '<div class="cconn-picker-row-dim">' + esc(dimLabel(c)) + '</div>' +
-          (c.custom && c.desc ? '<div class="cconn-custom-desc">' + esc(c.desc) + '</div>' : '') +
-          (c.custom && c.obs ? '<div class="cconn-custom-obs"><strong>Observações:</strong> ' + esc(c.obs) + '</div>' : '') +
-        '</div>';
-
-      var actionsHtml = c.custom
-        ? ('<div class="cconn-picker-row-actions">' + btnHtml +
-            '<button type="button" class="cconn-custom-edit-btn" data-edit-custom="' + esc(c.id) + '">Editar</button>' +
-            '<button type="button" class="cconn-custom-del-btn" data-del-custom="' + esc(c.id) + '">Excluir</button>' +
-          '</div>')
-        : btnHtml;
-
-      row.innerHTML = rowThumbHtml + bodyHtml + actionsHtml;
-
-      // Clique na linha (fora dos botões de ação) abre a descrição/detalhes
-      // completos da Conexão — Oficiais/Superiores/Especiais reaproveitam o
-      // modal do próprio Compêndio (openConexaoModal, em index.html, sem
-      // nenhuma alteração nele); Personalizadas usam uma visualização própria
-      // (elas não existem em CONEXOES_DATA, então não têm como abrir nesse
-      // modal). Nos dois casos, "Adicionar/Remover da Ficha" continua sendo
-      // a mesma função addConnection()/removeConnection() de sempre.
-      row.addEventListener("click", function(e){
-        if(e.target.closest("button")) return; // não interfere com Adicionar/Editar/Excluir
-        if(c.custom){
-          openCustomViewModal(c.id);
-        } else if(typeof openConexaoModal === "function" && typeof CONEXOES_DATA !== "undefined"){
-          cxModalPickerContext = true;
-          openConexaoModal(CONEXOES_DATA.indexOf(c));
-        }
-      });
+        '</div>' +
+        btnHtml;
 
       if(!blocked){
         var btn = row.querySelector(".cconn-picker-add-btn");
         btn.addEventListener("click", function(){
-          addConnection(ref);
+          addConnection(c.n);
           renderPickerList(); // atualiza o botão desta linha para "✓ Na Ficha"
-        });
-      }
-
-      if(c.custom){
-        row.querySelector("[data-edit-custom]").addEventListener("click", function(){
-          openCustomFormModal(c.id);
-        });
-        row.querySelector("[data-del-custom]").addEventListener("click", function(){
-          if(!confirm('Excluir a personalizada "' + c.n + '"? Ela também será removida de qualquer ficha em que estiver adicionada.')) return;
-          deletePersonalizada(c.id).then(function(){
-            renderPickerList();
-            renderAll(); // reflete a remoção em Minhas Conexões / Agentes, caso estivesse em alguma ficha
-          });
         });
       }
 
@@ -589,211 +407,6 @@
   function closePickerModal(){
     var m = document.getElementById("cconn_picker_modal");
     if(m) m.style.display = "none";
-  }
-
-  /* ==========================================================
-     MODAL "VER PERSONALIZADA"
-     Personalizadas não existem em CONEXOES_DATA, então não têm como
-     abrir no modal de detalhes do Compêndio (openConexaoModal) — esta
-     é a visualização equivalente para elas: mesmo texto completo sem
-     corte/truncamento, e as mesmas ações de sempre (addConnection/
-     removeConnection/openCustomFormModal/deletePersonalizada), sem
-     nenhuma lógica nova de adicionar/remover/editar/excluir.
-     ========================================================== */
-
-  function ensureCustomViewModal(){
-    if(document.getElementById("cconn_custom_view_modal")) return;
-
-    var overlay = document.createElement("div");
-    overlay.className = "modal-overlay";
-    overlay.id = "cconn_custom_view_modal";
-    overlay.innerHTML =
-      '<div class="modal-box cconn-custom-view-box">' +
-        '<button type="button" class="cconn-picker-close" id="ccv_close">&times;</button>' +
-        '<h3 id="ccv_title"></h3>' +
-        '<div class="cx-modal-dim" id="ccv_dim"></div>' +
-        '<div class="cconn-custom-desc" id="ccv_desc"></div>' +
-        '<div class="cconn-custom-obs" id="ccv_obs"></div>' +
-        '<div class="modal-actions" style="margin-top:14px;">' +
-          '<button type="button" id="ccv_add"></button>' +
-          '<button type="button" id="ccv_edit">Editar</button>' +
-          '<button type="button" id="ccv_delete">Excluir</button>' +
-          '<button type="button" id="ccv_close2">Fechar</button>' +
-        '</div>' +
-      '</div>';
-    document.body.appendChild(overlay);
-
-    document.getElementById("ccv_close").addEventListener("click", closeCustomViewModal);
-    document.getElementById("ccv_close2").addEventListener("click", closeCustomViewModal);
-    overlay.addEventListener("click", function(e){
-      if(e.target.id === "cconn_custom_view_modal") closeCustomViewModal();
-    });
-  }
-
-  var customViewId = null;
-
-  function openCustomViewModal(id){
-    ensureCustomViewModal();
-    customViewId = id;
-    refreshCustomViewModal();
-    document.getElementById("cconn_custom_view_modal").style.display = "flex";
-  }
-
-  function refreshCustomViewModal(){
-    var p = findPersonalizadaRaw(customViewId);
-    if(!p){ closeCustomViewModal(); return; }
-    var c = toCustomEntry(p);
-    var ref = CUSTOM_REF_PREFIX + p.id;
-    var inSheet = getConnRefs().indexOf(ref) !== -1;
-
-    document.getElementById("ccv_title").textContent = c.n;
-    document.getElementById("ccv_dim").textContent = dimLabel(c);
-    document.getElementById("ccv_desc").textContent = c.desc || "";
-    var obsEl = document.getElementById("ccv_obs");
-    obsEl.innerHTML = c.obs ? ("<strong>Observações:</strong> " + esc(c.obs)) : "";
-
-    var addBtn = document.getElementById("ccv_add");
-    addBtn.textContent = inSheet ? "Remover da Ficha" : "Adicionar à Ficha";
-    addBtn.onclick = function(){
-      if(inSheet) removeConnection(ref); else addConnection(ref);
-      refreshCustomViewModal();
-      renderPickerList();
-    };
-
-    document.getElementById("ccv_edit").onclick = function(){
-      closeCustomViewModal();
-      openCustomFormModal(p.id);
-    };
-    document.getElementById("ccv_delete").onclick = function(){
-      if(!confirm('Excluir a personalizada "' + c.n + '"? Ela também será removida de qualquer ficha em que estiver adicionada.')) return;
-      deletePersonalizada(p.id).then(function(){
-        closeCustomViewModal();
-        renderPickerList();
-        renderAll();
-      });
-    };
-  }
-
-  function closeCustomViewModal(){
-    var m = document.getElementById("cconn_custom_view_modal");
-    if(m) m.style.display = "none";
-    customViewId = null;
-  }
-
-  /* ==========================================================
-     MODAL "CRIAR/EDITAR PERSONALIZADA"
-     Reaproveita as mesmas classes base de modal/campo já usadas
-     pelo resto do projeto (.modal-overlay, .modal-box, .field) —
-     só adiciona o necessário em character-connections.css. Não é
-     um segundo "sistema de modal": é a interface de criação pedida,
-     que não tinha equivalente antes.
-     ========================================================== */
-
-  function ensureCustomFormModal(){
-    if(document.getElementById("cconn_custom_form_modal")) return;
-
-    var overlay = document.createElement("div");
-    overlay.className = "modal-overlay";
-    overlay.id = "cconn_custom_form_modal";
-    overlay.innerHTML =
-      '<div class="modal-box cconn-custom-form-box">' +
-        '<button type="button" class="cconn-picker-close" id="ccf_close">&times;</button>' +
-        '<h3 id="ccf_title">Criar Personalizada</h3>' +
-        '<div class="field"><label>Nome *</label><input type="text" id="ccf_nome" placeholder="Nome da entrada…"></div>' +
-        '<div class="field"><label>Tipo</label>' +
-          '<select id="ccf_tipo">' +
-            CUSTOM_TIPOS.map(function(t){ return '<option value="' + t + '">' + t + '</option>'; }).join("") +
-          '</select>' +
-        '</div>' +
-        '<div class="field"><label>Etiqueta</label><input type="text" id="ccf_etiqueta" placeholder="ex.: Física, Homebrew, NPC, Campanha…"></div>' +
-        '<div class="field"><label>Descrição</label><textarea id="ccf_desc" placeholder="Descrição…"></textarea></div>' +
-        '<div class="field"><label>Observações (opcional)</label><textarea id="ccf_obs" placeholder="Observações adicionais…"></textarea></div>' +
-        '<div class="cconn-custom-form-actions">' +
-          '<button type="button" id="ccf_delete" class="cconn-custom-del-form-btn" style="display:none;">Excluir</button>' +
-          '<button type="button" id="ccf_cancel">Cancelar</button>' +
-          '<button type="button" id="ccf_save">Salvar</button>' +
-        '</div>' +
-      '</div>';
-    document.body.appendChild(overlay);
-
-    document.getElementById("ccf_close").addEventListener("click", closeCustomFormModal);
-    document.getElementById("ccf_cancel").addEventListener("click", closeCustomFormModal);
-    overlay.addEventListener("click", function(e){
-      if(e.target.id === "cconn_custom_form_modal") closeCustomFormModal();
-    });
-
-    document.getElementById("ccf_save").addEventListener("click", saveCustomForm);
-  }
-
-  var customFormEditId = null;
-
-  function openCustomFormModal(editId){
-    ensureCustomFormModal();
-    customFormEditId = editId || null;
-
-    var title = document.getElementById("ccf_title");
-    var delBtn = document.getElementById("ccf_delete");
-    var nome = document.getElementById("ccf_nome");
-    var tipo = document.getElementById("ccf_tipo");
-    var etiqueta = document.getElementById("ccf_etiqueta");
-    var desc = document.getElementById("ccf_desc");
-    var obs = document.getElementById("ccf_obs");
-
-    if(editId){
-      var p = findPersonalizadaRaw(editId);
-      title.textContent = "Editar Personalizada";
-      delBtn.style.display = "";
-      delBtn.onclick = function(){
-        if(!confirm('Excluir a personalizada "' + (p ? p.n : "") + '"? Ela também será removida de qualquer ficha em que estiver adicionada.')) return;
-        deletePersonalizada(editId).then(function(){
-          closeCustomFormModal();
-          renderPickerList();
-          renderAll();
-        });
-      };
-      nome.value = p ? p.n : "";
-      tipo.value = p ? p.tipo : CUSTOM_TIPOS[0];
-      etiqueta.value = p ? (p.etiqueta || "") : "";
-      desc.value = p ? (p.desc || "") : "";
-      obs.value = p ? (p.obs || "") : "";
-    } else {
-      title.textContent = "Criar Personalizada";
-      delBtn.style.display = "none";
-      delBtn.onclick = null;
-      nome.value = "";
-      tipo.value = CUSTOM_TIPOS[0];
-      etiqueta.value = "";
-      desc.value = "";
-      obs.value = "";
-    }
-
-    document.getElementById("cconn_custom_form_modal").style.display = "flex";
-    nome.focus();
-  }
-
-  function closeCustomFormModal(){
-    var m = document.getElementById("cconn_custom_form_modal");
-    if(m) m.style.display = "none";
-    customFormEditId = null;
-  }
-
-  function saveCustomForm(){
-    var nome = document.getElementById("ccf_nome").value.trim();
-    if(!nome){
-      document.getElementById("ccf_nome").focus();
-      return; // Nome é obrigatório — não salva sem ele.
-    }
-    var data = {
-      n: nome,
-      tipo: document.getElementById("ccf_tipo").value || CUSTOM_TIPOS[0],
-      etiqueta: document.getElementById("ccf_etiqueta").value.trim(),
-      desc: document.getElementById("ccf_desc").value.trim(),
-      obs: document.getElementById("ccf_obs").value.trim()
-    };
-    upsertPersonalizada(data, customFormEditId).then(function(){
-      closeCustomFormModal();
-      renderPickerList();
-    });
   }
 
   /* ==========================================================
@@ -827,87 +440,13 @@
     }
   }
 
-  /* ==========================================================
-     "ADICIONAR/REMOVER" DENTRO DO MODAL DE DETALHES DO COMPÊNDIO
-     Mesmo padrão de wrapSheetFunctions() acima: openConexaoModal()
-     (definida em index.html) não é reescrita, só envolvida, para
-     injetar um único botão extra na barra de ações que já existe
-     em #cx_modal (.modal-actions) — sem duplicar o modal, sem
-     duplicar addConnection()/removeConnection(). O botão só aparece
-     quando o modal foi aberto a partir do picker (cxModalPickerContext);
-     nas demais chamadas (navegação normal do Compêndio, clique em
-     Agentes → Conexão) o modal continua exatamente como sempre foi.
-     ========================================================== */
-
-  function ensureCxModalActionBtn(){
-    var bar = document.querySelector("#cx_modal .modal-actions");
-    if(!bar || document.getElementById("cconn_cx_modal_add_btn")) return;
-    var btn = document.createElement("button");
-    btn.type = "button";
-    btn.id = "cconn_cx_modal_add_btn";
-    btn.style.display = "none";
-    bar.insertBefore(btn, bar.firstChild);
-    btn.addEventListener("click", function(){
-      var ref = btn.getAttribute("data-ref");
-      if(!ref) return;
-      if(btn.getAttribute("data-in-sheet") === "1"){
-        removeConnection(ref);
-      } else {
-        addConnection(ref);
-      }
-      updateCxModalActionBtn(ref);
-      renderPickerList(); // mantém o botão da linha, atrás do modal, sincronizado
-    });
-  }
-
-  function updateCxModalActionBtn(ref){
-    var btn = document.getElementById("cconn_cx_modal_add_btn");
-    if(!btn) return;
-    var c = findConnByRef(ref);
-    if(c && c.noAdd === true){
-      btn.style.display = "none"; // Aborto Límbico — nunca adicionável
-      return;
-    }
-    var inSheet = getConnRefs().indexOf(ref) !== -1;
-    btn.textContent = inSheet ? "Remover da Ficha" : "Adicionar à Ficha";
-    btn.setAttribute("data-ref", ref);
-    btn.setAttribute("data-in-sheet", inSheet ? "1" : "0");
-    btn.style.display = "";
-  }
-
-  function wrapOpenConexaoModal(){
-    if(typeof openConexaoModal !== "function") return;
-    var _origOpenConexaoModal = openConexaoModal;
-    openConexaoModal = function(idx){
-      _origOpenConexaoModal(idx);
-      ensureCxModalActionBtn();
-      var btn = document.getElementById("cconn_cx_modal_add_btn");
-      if(btn){
-        if(cxModalPickerContext && typeof CONEXOES_DATA !== "undefined" && CONEXOES_DATA[idx]){
-          updateCxModalActionBtn(CONEXOES_DATA[idx].n);
-        } else {
-          btn.style.display = "none";
-        }
-      }
-      cxModalPickerContext = false;
-    };
-  }
-
   /* ---------- boot ---------- */
   function initCharacterConnections(){
     ensureHiddenField();
     wrapSheetFunctions();
-    wrapOpenConexaoModal();
     ensureParanormalPanel();
     ensureAgentesDisplayPanel();
     renderAll();
-    // Personalizadas são conteúdo do projeto (não de uma ficha específica),
-    // carregadas uma única vez, em paralelo, sem travar o resto do boot —
-    // mesmo padrão de loadInventory()/loadParanormal() no index.html.
-    // Como algumas fichas antigas podem referenciar "custom:<id>" antes
-    // deste carregamento terminar, renderAll() roda de novo ao concluir,
-    // resolvendo essas referências corretamente.
-    loadPersonalizadas().then(renderAll);
   }
 
   if(document.readyState === "loading"){
