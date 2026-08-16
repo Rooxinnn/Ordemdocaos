@@ -1,0 +1,165 @@
+/* ==========================================================================
+   MÓDULO VISUAL — ESTADO "ABORTO LÍMBICO" (v2 — versão discreta)
+   ==========================================================================
+   Este arquivo NÃO define lógica nenhuma. Ele só reage à classe
+   ".limbo-active", que o index.html já liga/desliga sozinho em
+   renderAbortoLimbico() sempre que o estado (aborto_limbico_ativo) muda —
+   inclusive ao criar, duplicar, trocar ou carregar fichas.
+
+   Carregado via <link> DEPOIS do </style> inline do index.html, para que
+   as regras aqui vençam por ordem de cascata (mesma especificidade) sem
+   precisar de !important.
+
+   AJUSTE PEDIDO (v2): a v1 se afastou demais da ficha original. Esta
+   versão preserva ~80-90% da aparência normal — fundo, painéis, bordas,
+   tipografia, layout e o âmbar continuam praticamente os mesmos. As
+   custom properties (--panel, --paper, --line etc.) NÃO são mais
+   sobrescritas de propósito, para não repintar a ficha inteira. Só:
+     1) o âmbar perde um pouco (não todo) o brilho em alguns pontos;
+     2) elementos físicos ganham um contraste levemente maior + um
+        acento fino em vermelho queimado/laranja escuro;
+     3) elementos paranormais ficam levemente menos saturados/brilhantes
+        (nunca escondidos, removidos ou desativados);
+     4) a névoa de ativação continua desligada (pedido explícito anterior
+        de não ter fumaça/aura/energia mágica), substituída por um
+        rim-light quase imperceptível.
+
+   MAPEAMENTO físico x paranormal (seções 3 e 4) extraído das listas
+   ATRIBUTOS/HABILIDADES/TALENTOS/PERICIAS já existentes no index.html —
+   ver comentário equivalente na v1 caso essas listas mudem de ID no
+   futuro.
+   ========================================================================== */
+
+
+/* --------------------------------------------------------------------------
+   1) NÉVOA DE ATIVAÇÃO — continua desligada (sem fumaça/aura/energia).
+   Fica só um rim-light quase imperceptível, com tom quente neutro para
+   não destoar da paleta original (nada de branco frio "de sistema").
+   -------------------------------------------------------------------------- */
+#agent-sheet-capture.limbo-active::before,
+#agent-sheet-capture.limbo-active::after{
+  content:none;
+}
+#agent-sheet-capture.limbo-active .panel,
+#agent-sheet-capture.limbo-active .titlebar{
+  box-shadow:0 0 8px rgba(255,244,230,0.035), 0 1px 3px rgba(0,0,0,0.2);
+}
+
+/* --------------------------------------------------------------------------
+   2) TRANSIÇÃO — sutil, nos dois sentidos.
+   -------------------------------------------------------------------------- */
+#agent-sheet-capture,
+#agent-sheet-capture *{
+  transition:background-color .3s ease, border-color .3s ease,
+             color .3s ease, box-shadow .3s ease, text-shadow .3s ease,
+             opacity .3s ease, filter .3s ease;
+}
+@media (prefers-reduced-motion: reduce){
+  #agent-sheet-capture,
+  #agent-sheet-capture *{ transition:none; }
+}
+
+/* --------------------------------------------------------------------------
+   3) CORPO EM DESTAQUE (discreto) — atributos, talentos, habilidades e
+   perícias fisicamente relevantes ganham só um leve acento em vermelho
+   queimado/laranja escuro na borda inferior do valor, sem trocar a cor
+   principal do texto nem o brilho âmbar do resto da ficha.
+   -------------------------------------------------------------------------- */
+#agent-sheet-capture.limbo-active .skill-name[data-skill-name="agilidade"],
+#agent-sheet-capture.limbo-active .skill-name[data-skill-name="forca_fisica"],
+#agent-sheet-capture.limbo-active .skill-name[data-skill-name="resistencia"],
+#agent-sheet-capture.limbo-active .skill-name[data-skill-name="velocidade"],
+#agent-sheet-capture.limbo-active .skill-name[data-skill-name="atletismo"],
+#agent-sheet-capture.limbo-active .skill-name[data-skill-name="flexibilidade"],
+#agent-sheet-capture.limbo-active .skill-name[data-skill-name="marcial"],
+#agent-sheet-capture.limbo-active .skill-name[data-skill-name="natacao"],
+#agent-sheet-capture.limbo-active .skill-name[data-skill-name="combate"],
+#agent-sheet-capture.limbo-active .skill-name[data-skill-name="folego"],
+#agent-sheet-capture.limbo-active .skill-name[data-skill-name="mirar"],
+#agent-sheet-capture.limbo-active .skill-name[data-skill-name="rastrear"],
+#agent-sheet-capture.limbo-active .skill-name[data-skill-name="silencioso"],
+#agent-sheet-capture.limbo-active .skill-name[data-skill-name="pericia_armas_brancas"],
+#agent-sheet-capture.limbo-active .skill-name[data-skill-name="pericia_armas_fogo"]{
+  text-shadow:0 0 4px rgba(185,87,42,0.28);
+}
+#agent-sheet-capture.limbo-active .skill-name[data-skill-name="agilidade"] ~ .pts-wrap input,
+#agent-sheet-capture.limbo-active .skill-name[data-skill-name="forca_fisica"] ~ .pts-wrap input,
+#agent-sheet-capture.limbo-active .skill-name[data-skill-name="resistencia"] ~ .pts-wrap input,
+#agent-sheet-capture.limbo-active .skill-name[data-skill-name="velocidade"] ~ .pts-wrap input,
+#agent-sheet-capture.limbo-active .skill-name[data-skill-name="atletismo"] ~ .pts-wrap input,
+#agent-sheet-capture.limbo-active .skill-name[data-skill-name="flexibilidade"] ~ .pts-wrap input,
+#agent-sheet-capture.limbo-active .skill-name[data-skill-name="marcial"] ~ .pts-wrap input,
+#agent-sheet-capture.limbo-active .skill-name[data-skill-name="natacao"] ~ .pts-wrap input,
+#agent-sheet-capture.limbo-active .skill-name[data-skill-name="combate"] ~ .pts-wrap input,
+#agent-sheet-capture.limbo-active .skill-name[data-skill-name="folego"] ~ .pts-wrap input,
+#agent-sheet-capture.limbo-active .skill-name[data-skill-name="mirar"] ~ .pts-wrap input,
+#agent-sheet-capture.limbo-active .skill-name[data-skill-name="rastrear"] ~ .pts-wrap input,
+#agent-sheet-capture.limbo-active .skill-name[data-skill-name="silencioso"] ~ .pts-wrap input,
+#agent-sheet-capture.limbo-active .skill-name[data-skill-name="pericia_armas_brancas"] ~ .pts-wrap input,
+#agent-sheet-capture.limbo-active .skill-name[data-skill-name="pericia_armas_fogo"] ~ .pts-wrap input{
+  border-bottom-color:#B9572A;
+  text-shadow:0 0 4px rgba(185,87,42,0.3);
+}
+
+/* --------------------------------------------------------------------------
+   4) PARANORMAL EM SEGUNDO PLANO (discreto) — leve perda de saturação e
+   brilho via filter, nada é escondido/removido/desativado.
+   -------------------------------------------------------------------------- */
+#agent-sheet-capture.limbo-active .skill-name[data-skill-name="ocultismo"],
+#agent-sheet-capture.limbo-active .skill-name[data-skill-name="resistencia_psiquica"],
+#agent-sheet-capture.limbo-active .skill-name[data-skill-name="sentido_paranormal"],
+#agent-sheet-capture.limbo-active .skill-name[data-skill-name="ilusionismo"],
+#agent-sheet-capture.limbo-active .skill-name[data-skill-name="pericia_medica_ocultista"]{
+  filter:saturate(0.72) brightness(0.94);
+  opacity:0.9;
+}
+#agent-sheet-capture.limbo-active .combat-dimension-box{
+  filter:saturate(0.75) brightness(0.95);
+  opacity:0.92;
+}
+
+/* --------------------------------------------------------------------------
+   5) ÂMBAR — perde só um pouco (não todo) o brilho nos pontos onde o
+   glow é mais forte no estado normal. Continua âmbar, só mais contido.
+   -------------------------------------------------------------------------- */
+#agent-sheet-capture.limbo-active .titlebar-logo{
+  box-shadow:0 0 18px rgba(240,168,60,0.22);
+}
+#agent-sheet-capture.limbo-active .san-box{
+  background:radial-gradient(circle at 50% 30%, rgba(184,121,26,0.11), var(--panel-2) 70%);
+}
+#agent-sheet-capture.limbo-active .san-value,
+#agent-sheet-capture.limbo-active .san-values-cell input{
+  text-shadow:0 0 10px rgba(240,168,60,0.34);
+}
+#agent-sheet-capture.limbo-active .combat-hero-box{
+  background:radial-gradient(circle at 50% 20%, rgba(184,121,26,0.1), var(--panel-2) 75%);
+}
+#agent-sheet-capture.limbo-active .dice-tiers span.on{
+  background:rgba(184,121,26,0.24);
+}
+#agent-sheet-capture.limbo-active .pts-atual input{
+  text-shadow:0 0 6px rgba(240,168,60,0.22);
+}
+#agent-sheet-capture.limbo-active button.primary{
+  background:rgba(240,168,60,0.1);
+}
+#agent-sheet-capture.limbo-active .al-toggle-btn{
+  background:rgba(240,168,60,0.09);
+}
+#agent-sheet-capture.limbo-active .al-buff-card.selected{
+  background:rgba(240,168,60,0.07);
+}
+
+/* --------------------------------------------------------------------------
+   6) BADGE E PAINEL DO ABORTO LÍMBICO — mantêm a aparência âmbar padrão
+   quase intacta; só um contorno em vermelho queimado no lugar do
+   contorno amber-bright, e um brilho levemente mais contido.
+   -------------------------------------------------------------------------- */
+#agent-sheet-capture.limbo-active .titlebar-al-badge{
+  border-color:#B9572A;
+  box-shadow:0 0 10px rgba(240,168,60,0.28);
+}
+#agent-sheet-capture.limbo-active #panel_aborto_limbico.al-active{
+  box-shadow:inset 0 0 14px rgba(240,168,60,0.12), inset 2px 0 0 #8F3025;
+}
