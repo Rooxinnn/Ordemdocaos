@@ -396,11 +396,14 @@
 
       // Reaproveita o modal de detalhes: Conexão oficial → modal do
       // Compêndio (openConexaoModal, sem nenhuma alteração nele);
-      // Personalizada → modal próprio, que popula o MESMO #cx_modal.
+      // Personalizada → modal próprio, que popula o MESMO #cx_modal,
+      // mas aqui (AGENTES) sempre em modo somente leitura — o
+      // gerenciamento (Adicionar/Remover da Ficha, Editar, Excluir)
+      // continua existindo só em PARANORMAL → PERSONALIZADAS.
       if(c){
         block.addEventListener("click", function(){
           if(c.__custom){
-            openPersonalizadaModal(c);
+            openPersonalizadaModal(c, true);
           } else if(typeof openConexaoModal === "function" && typeof CONEXOES_DATA !== "undefined"){
             openConexaoModal(CONEXOES_DATA.indexOf(c));
           }
@@ -730,7 +733,13 @@
     if(actions) actions.style.display = "none";
   }
 
-  function openPersonalizadaModal(entry){
+  // readOnly: quando true (chamado a partir de AGENTES → CONEXÕES), o
+  // modal mostra exatamente os mesmos dados (nome/etiqueta/descrição),
+  // mas NÃO monta a barra de ações (Adicionar/Remover da Ficha, Editar,
+  // Excluir) — vira puramente visualização. Sem esse parâmetro (chamado
+  // a partir de PARANORMAL → PERSONALIZADAS), o comportamento de
+  // gerenciamento continua exatamente como já era.
+  function openPersonalizadaModal(entry, readOnly){
     var cc = findCustomById(entry.id);
     if(!cc) return; // foi excluída entre um clique e outro
     var c = customToEntry(cc);
@@ -761,29 +770,37 @@
 
     var actions = ensureModalCustomActions();
     if(actions){
-      var refs = getConnRefs();
-      var inSheet = refs.indexOf(c.id) !== -1;
-      actions.innerHTML =
-        '<button type="button" id="cconn_modal_toggle_btn" class="primary">' + (inSheet ? "Remover da Ficha" : "Adicionar à Ficha") + '</button>' +
-        '<button type="button" id="cconn_modal_edit_btn">Editar</button>' +
-        '<button type="button" id="cconn_modal_delete_btn">Excluir</button>';
-      actions.style.display = "flex";
+      if(readOnly){
+        // AGENTES → CONEXÕES: somente leitura. Nunca mostra Adicionar/
+        // Remover da Ficha, Editar ou Excluir aqui — o gerenciamento
+        // continua exclusivo de PARANORMAL → PERSONALIZADAS.
+        actions.innerHTML = "";
+        actions.style.display = "none";
+      } else {
+        var refs = getConnRefs();
+        var inSheet = refs.indexOf(c.id) !== -1;
+        actions.innerHTML =
+          '<button type="button" id="cconn_modal_toggle_btn" class="primary">' + (inSheet ? "Remover da Ficha" : "Adicionar à Ficha") + '</button>' +
+          '<button type="button" id="cconn_modal_edit_btn">Editar</button>' +
+          '<button type="button" id="cconn_modal_delete_btn">Excluir</button>';
+        actions.style.display = "flex";
 
-      document.getElementById("cconn_modal_toggle_btn").addEventListener("click", function(){
-        if(inSheet) removeConnection(c.id); else addConnection(c.id);
-        openPersonalizadaModal(c); // re-renderiza o modal já com o novo estado
-      });
-      document.getElementById("cconn_modal_edit_btn").addEventListener("click", function(){
-        document.getElementById("cx_modal").style.display = "none";
-        openCustomForm(cc, true);
-      });
-      document.getElementById("cconn_modal_delete_btn").addEventListener("click", function(){
-        if(!confirm('Excluir a Conexão Personalizada "' + cc.name + '"? Essa ação não pode ser desfeita.')) return;
-        deleteCustomConnection(cc.id);
-        removeConnection(cc.id); // some da ficha atual, se estiver associada (já renderiza tudo de novo)
-        document.getElementById("cx_modal").style.display = "none";
-        renderPickerList();
-      });
+        document.getElementById("cconn_modal_toggle_btn").addEventListener("click", function(){
+          if(inSheet) removeConnection(c.id); else addConnection(c.id);
+          openPersonalizadaModal(c); // re-renderiza o modal já com o novo estado (gerenciamento)
+        });
+        document.getElementById("cconn_modal_edit_btn").addEventListener("click", function(){
+          document.getElementById("cx_modal").style.display = "none";
+          openCustomForm(cc, true);
+        });
+        document.getElementById("cconn_modal_delete_btn").addEventListener("click", function(){
+          if(!confirm('Excluir a Conexão Personalizada "' + cc.name + '"? Essa ação não pode ser desfeita.')) return;
+          deleteCustomConnection(cc.id);
+          removeConnection(cc.id); // some da ficha atual, se estiver associada (já renderiza tudo de novo)
+          document.getElementById("cx_modal").style.display = "none";
+          renderPickerList();
+        });
+      }
     }
 
     document.getElementById("cx_modal").style.display = "flex";
