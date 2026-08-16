@@ -153,14 +153,6 @@
   border:1px solid var(--line);
   border-left:3px solid var(--cx-c, var(--line));
   padding:8px 10px;
-  cursor:pointer; /* a linha inteira (fora dos botões) abre a descrição/detalhes */
-  transition:border-color 0.15s ease;
-}
-.cconn-picker-row:hover{
-  border-color:var(--amber-bright);
-}
-.cconn-picker-row button{
-  cursor:pointer; /* garante que os botões não herdem nenhum estilo "desabilitado" visual da linha */
 }
 
 .cconn-picker-row-body{
@@ -327,37 +319,3 @@
   color:#e0605a;
 }
 .cconn-custom-del-form-btn:hover{ background:rgba(224,96,90,0.12); }
-
-/* ---------- Modal "Ver Personalizada" (equivalente ao modal de
-   detalhes do Compêndio, para entradas que não estão em CONEXOES_DATA) ---------- */
-.cconn-custom-view-box{
-  max-width:520px;
-  width:100%;
-  text-align:left;
-  max-height:86vh;
-  overflow-y:auto;
-  position:relative;
-}
-.cconn-custom-view-box h3{
-  margin:0 0 4px;
-  padding-right:30px;
-  font-family:'Oswald',sans-serif;
-  font-size:16px;
-  text-transform:uppercase;
-  letter-spacing:0.06em;
-  color:var(--amber-bright);
-}
-.cconn-custom-view-box .cx-modal-dim{
-  margin-bottom:14px;
-}
-.cconn-custom-view-box .modal-actions{
-  display:flex;
-  flex-wrap:wrap;
-  gap:10px;
-  justify-content:flex-start;
-}
-.cconn-custom-view-box #ccv_delete{
-  border-color:#e0605a;
-  color:#e0605a;
-}
-.cconn-custom-view-box #ccv_delete:hover{ background:rgba(224,96,90,0.12); }
