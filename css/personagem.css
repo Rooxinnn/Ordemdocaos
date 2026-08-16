@@ -1,0 +1,119 @@
+/* ==========================================================
+   IMAGEM DO PERSONAGEM
+   Arquivo isolado: só soma classes novas, prefixadas com
+   "pchar-", reaproveitando as variáveis de cor já definidas em
+   :root. Não redefine nenhuma classe existente da ficha ou do
+   gerenciador — a única exceção é uma propriedade adicional
+   (padding-right) somada a ".sheet-card-name" só para abrir
+   espaço visual para a miniatura, sem remover/sobrescrever
+   nada que já existia nessa regra.
+   ========================================================== */
+
+/* ---------- Ficha (aba Agentes) — retrato na titlebar ---------- */
+.pchar-portrait{
+  position:relative;
+  width:64px;
+  height:64px;
+  flex:0 0 auto;
+  background:var(--panel-2);
+  border:1px solid var(--line);
+  box-shadow:0 0 14px rgba(240,168,60,0.14);
+  cursor:pointer;
+  overflow:visible;
+}
+.pchar-portrait:hover,
+.pchar-portrait:focus-visible{
+  border-color:var(--amber-bright);
+  box-shadow:0 0 18px rgba(240,168,60,0.3);
+}
+.pchar-portrait:focus-visible{ outline:none; }
+
+.pchar-portrait-frame{
+  width:100%;
+  height:100%;
+  overflow:hidden;
+  border:1px solid var(--line);
+}
+.pchar-portrait img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+}
+
+.pchar-portrait-placeholder{
+  width:100%;
+  height:100%;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:2px;
+  border:1px dashed var(--sigil);
+  color:var(--sigil);
+  transition:color 0.2s ease, border-color 0.2s ease;
+}
+.pchar-portrait:hover .pchar-portrait-placeholder,
+.pchar-portrait:focus-visible .pchar-portrait-placeholder{
+  color:var(--amber-bright);
+  border-color:var(--amber-bright);
+}
+.pchar-plus{ font-size:16px; line-height:1; font-family:'Oswald',sans-serif; }
+.pchar-label{ font-size:7px; letter-spacing:0.1em; text-transform:uppercase; }
+
+.pchar-portrait-remove{
+  position:absolute;
+  top:-8px;
+  right:-8px;
+  width:20px;
+  height:20px;
+  padding:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:var(--panel);
+  border:1px solid var(--line);
+  color:var(--sigil);
+  font-size:13px;
+  line-height:1;
+  border-radius:50%;
+  cursor:pointer;
+}
+.pchar-portrait-remove:hover{
+  color:#e06060;
+  border-color:#e06060;
+}
+
+@media(max-width:640px){
+  .pchar-portrait{ width:52px; height:52px; }
+}
+
+/* ---------- Gerenciador de fichas — miniatura no card ---------- */
+.pchar-card-thumb{
+  position:absolute;
+  top:16px;
+  right:16px;
+  width:46px;
+  height:46px;
+  background:var(--panel-2);
+  border:1px solid var(--line);
+  overflow:hidden;
+  z-index:2;
+}
+.pchar-card-thumb img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+}
+.pchar-card-thumb .pchar-portrait-placeholder{
+  border:1px dashed var(--sigil);
+}
+.pchar-card-thumb .pchar-plus{ font-size:14px; }
+.pchar-card-thumb .pchar-label{ display:none; }
+
+/* abre espaço para a miniatura não sobrepor o nome da ficha —
+   soma só esta propriedade à regra já existente, nada é removido */
+.sheet-card-name{
+  padding-right:62px;
+}
