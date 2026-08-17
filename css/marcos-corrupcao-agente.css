@@ -51,7 +51,42 @@
   color:var(--amber-bright);
 }
 
-/* ---------- painel "Marcos de Corrupção Alcançados" ---------- */
+/* ---------- painel "Marcos de Corrupção Alcançados" — recolhível ----------
+   ALTERAÇÃO 2 do pedido: o próprio <h2> já existente (herda toda a
+   aparência de ".panel h2" já definida em index.html) vira um cabeçalho
+   clicável, só somando um ícone ▲/▼. Não é uma aba/painel novo — apenas
+   oculta/mostra o corpo (#mca_body) que já existia dentro do MESMO painel
+   "Marcos de Corrupção Alcançados". */
+.mca-toggle-header{
+  cursor:pointer;
+  user-select:none;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+}
+.mca-toggle-header:hover{
+  color:var(--amber-bright);
+}
+.mca-toggle-icon{
+  font-size:12px;
+  color:var(--sigil);
+  flex:0 0 auto;
+}
+.mca-collapse-body{
+  overflow:hidden;
+}
+/* Ao recolher, o espaço realmente é liberado (instrução 13) — sem
+   deixar nenhum espaço vazio no lugar do conteúdo. */
+.mca-panel.is-collapsed{
+  margin-bottom:18px; /* mantém o mesmo espaçamento entre painéis já usado por .panel */
+}
+.mca-panel.is-collapsed .mca-toggle-header{
+  margin-bottom:0;
+  border-bottom:none;
+  padding-bottom:0;
+}
+
 .mca-panel #mca_list{
   display:flex;
   flex-direction:column;
