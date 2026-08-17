@@ -199,43 +199,44 @@
   function renderPanel() {
     var list = document.getElementById("mca_list");
     if (!list) return;
-    var achieved = readAchieved();
 
-    if (achieved.length === 0) {
+    // A lista exibida NÃO é mais o histórico permanente gravado em
+    // #marcos_corrupcao_conquistados — esse campo continua existindo e
+    // sendo salvo (serve só para a fila de popups não repetir um aviso já
+    // mostrado, ver checkForNewMarcos). O que aparece aqui é sempre
+    // recalculado a partir do estado atual da ficha: Dimensão selecionada
+    // agora + valor atual de Corrupção agora. Isso cobre automaticamente
+    // aumento, diminuição e troca de Dimensão, sem herdar nada de outra
+    // ficha nem de uma leitura anterior.
+    var sel = document.getElementById(DIM_FIELD_ID);
+    var dimKey = sel ? sel.value : "";
+    var atual = corrupcaoAtual();
+
+    var marcos = [];
+    if (dimKey && !NON_CORRUPTION_DIMS[dimKey] && atual !== null) {
+      marcos = marcosDaDimensao(dimKey).filter(function (m) { return m.corrupcao <= atual; });
+      marcos.sort(function (a, b) { return a.corrupcao - b.corrupcao; });
+    }
+
+    if (marcos.length === 0) {
       list.innerHTML = '<div class="empty-state">Nenhum Marco de Corrupção alcançado ainda.</div>';
       return;
     }
 
-    // Agrupa por Dimensão, na ordem canônica já existente — mesmo que a
-    // ficha já tenha trocado de Dimensão, os grupos históricos continuam
-    // aparecendo (instrução 14/15).
-    var byDim = {};
-    achieved.forEach(function (id) {
-      var m = findMarco(id);
-      if (!m) return; // Marco não encontrado no Compêndio (ex.: dado corrompido) — ignora silenciosamente
-      (byDim[m.dimensao] = byDim[m.dimensao] || []).push(m);
+    var html = '<div class="mca-group cx-' + esc(dimKey) + '">';
+    html += '<div class="mca-group-title">' + esc((DIM_EMOJI[dimKey] || "") + " " + dimLabel(dimKey).toUpperCase()) + '</div>';
+    marcos.forEach(function (m) {
+      html += '<button type="button" class="mca-row" data-mca-id="' + esc(m.id) + '">' +
+        '<span class="mca-row-star">★</span>' +
+        '<span class="mca-row-body">' +
+          '<span class="mca-row-title">' + esc(m.titulo) + '</span>' +
+          '<span class="mca-row-corrupcao">Corrupção: ' + esc(m.corrupcao) + '</span>' +
+        '</span>' +
+      '</button>';
     });
+    html += '</div>';
 
-    var html = "";
-    dimKeys().forEach(function (key) {
-      var marcos = byDim[key];
-      if (!marcos || marcos.length === 0) return;
-      marcos.sort(function (a, b) { return a.corrupcao - b.corrupcao; });
-      html += '<div class="mca-group cx-' + esc(key) + '">';
-      html += '<div class="mca-group-title">' + esc((DIM_EMOJI[key] || "") + " " + dimLabel(key).toUpperCase()) + '</div>';
-      marcos.forEach(function (m) {
-        html += '<button type="button" class="mca-row" data-mca-id="' + esc(m.id) + '">' +
-          '<span class="mca-row-star">★</span>' +
-          '<span class="mca-row-body">' +
-            '<span class="mca-row-title">' + esc(m.titulo) + '</span>' +
-            '<span class="mca-row-corrupcao">Corrupção: ' + esc(m.corrupcao) + '</span>' +
-          '</span>' +
-        '</button>';
-      });
-      html += '</div>';
-    });
-
-    list.innerHTML = html || '<div class="empty-state">Nenhum Marco de Corrupção alcançado ainda.</div>';
+    list.innerHTML = html;
     list.querySelectorAll("[data-mca-id]").forEach(function (btn) {
       btn.addEventListener("click", function () {
         var m = findMarco(btn.getAttribute("data-mca-id"));
