@@ -190,10 +190,39 @@
     var panel = document.createElement("div");
     panel.className = "panel mca-panel";
     panel.id = "mca_panel";
+    // ALTERAÇÃO 2 do pedido (minimizar Corrupção/Infecção): o cabeçalho
+    // <h2> vira um toggle recolhível (mesmo <h2>/.panel já existente, só
+    // com um ícone ▲/▼ clicável somado — nenhum novo container/aba/painel
+    // é criado, só expande/recolhe o próprio painel "Marcos de Corrupção
+    // Alcançados" que já existia). O conteúdo passa a ficar dentro de
+    // #mca_body, que é apenas ocultado (display:none) ao recolher — o
+    // polling/checkForNewMarcos() continua rodando normalmente mesmo com
+    // o painel recolhido (instrução 15), só a exibição é afetada.
     panel.innerHTML =
-      '<h2>Marcos de Corrupção Alcançados</h2>' +
-      '<div id="mca_list"></div>';
+      '<h2 class="mca-toggle-header" id="mca_toggle" role="button" tabindex="0" aria-expanded="true">' +
+        '<span>Marcos de Corrupção Alcançados</span>' +
+        '<span class="mca-toggle-icon" id="mca_toggle_icon">▲</span>' +
+      '</h2>' +
+      '<div class="mca-collapse-body" id="mca_body"><div id="mca_list"></div></div>';
     hostPanel.parentElement.insertBefore(panel, hostPanel.nextSibling);
+
+    var header = document.getElementById("mca_toggle");
+    header.addEventListener("click", toggleCollapse);
+    header.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleCollapse(); }
+    });
+  }
+
+  function toggleCollapse() {
+    var panel = document.getElementById("mca_panel");
+    var body = document.getElementById("mca_body");
+    var icon = document.getElementById("mca_toggle_icon");
+    var header = document.getElementById("mca_toggle");
+    if (!panel || !body || !icon) return;
+    var collapsed = panel.classList.toggle("is-collapsed");
+    body.style.display = collapsed ? "none" : "";
+    icon.textContent = collapsed ? "▼" : "▲";
+    if (header) header.setAttribute("aria-expanded", collapsed ? "false" : "true");
   }
 
   function renderPanel() {
