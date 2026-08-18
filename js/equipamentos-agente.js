@@ -82,6 +82,45 @@
    envolver openSheet()/createNewSheet()), chamando o render desta
    área nova logo depois do render original do Inventário. Nenhuma
    linha de index.html precisou ser tocada para esta etapa.
+
+   ----------------------------------------------------------
+   ETAPA 4 — ITEM PERSONALIZADO (SISTEMA "ADICIONAR" JÁ EXISTENTE
+   DO INVENTÁRIO) TAMBÉM APARECE EM ITENS, E PESO TOTAL AUTOMÁTICO
+   ----------------------------------------------------------
+   O Inventário já possui, além dos equipamentos do Compêndio, o
+   sistema de criar/adicionar um item próprio (campos #inv_nome/
+   #inv_qtd/#inv_peso/#inv_desc + botão #btn_inv_add, já existentes
+   em index.html) — isso já empurra o item direto para o MESMO
+   invItems (sem eqRef, só nome/qtd/peso/desc). Nada disso foi
+   criado por este módulo nem precisou ser alterado: só passou a ser
+   RECONHECIDO também pela sincronização com ITENS (acima) e pelo
+   cálculo do Peso Total (abaixo), tratando um item com eqRef e um
+   item manual como duas "formas" do mesmo Inventário.
+
+   Popup do item personalizado: como esse tipo de item não existe em
+   EQUIPAMENTOS_DATA (não tem ID no Compêndio), não há como reabrir
+   window.Equipamentos.openItemModal() para ele — por isso este
+   módulo monta um modal próprio (#eqinv_custom_modal), mas
+   reaproveitando a MESMA estrutura genérica de popup já usada por
+   todo o projeto (".modal-overlay"/".modal-box"/".cx-modal-box"/
+   ".cx-modal-section"/".modal-actions"), só populada com os dados
+   que o próprio item já tem (nome/qtd/peso/desc) — nenhum dado novo,
+   nenhuma segunda biblioteca.
+
+   Peso Total (#peso_total, painel "Itens do Agente"): já existia
+   como campo numérico digitado à mão. Passa a ser somado
+   automaticamente a partir do MESMO invItems (peso de cada
+   equipamento vem de EQUIPAMENTOS_DATA via eqRef; peso de cada item
+   manual vem do próprio item, multiplicado pela qtd já existente
+   nele) — mesmo cálculo que #inv_peso_total (Inventário) já faz,
+   sem duplicar essa lógica em nenhum outro lugar novo. Nunca é
+   salvo como um dado à parte: é recalculado do zero (e sobrescrito
+   na tela) toda vez que renderInventory() roda, então mesmo que um
+   valor antigo digitado à mão tenha sido salvo antes desta etapa,
+   ele é substituído assim que a ficha é aberta ou o Inventário muda.
+   Passa a ser somente leitura (definido em runtime por este script,
+   sem alterar o atributo no HTML) para deixar claro que não deve
+   mais ser digitado manualmente.
    ========================================================== */
 (function () {
   "use strict";
@@ -250,12 +289,11 @@
   /* ==========================================================
      "AGENTES → ITENS DO AGENTE" — ESPELHO SOMENTE VISUAL DO INVENTÁRIO
      Não cria nenhum array novo: lê invItems (mesma fonte do
-     Inventário) a cada chamada, filtra só os itens referenciados
-     (item.eqRef) e desenha um card clicável por item, na mesma
-     ordem em que aparecem no Inventário. Itens manuais do
-     Inventário (nome/qtd/peso/desc, sem eqRef) não entram aqui —
-     eles nunca tiveram equivalente em EQUIPAMENTOS_DATA para abrir
-     um popup, então não fazem parte desta sincronização.
+     Inventário) a cada chamada e desenha um card clicável por item,
+     na mesma ordem em que aparecem no Inventário — tanto para
+     equipamentos do Compêndio (item.eqRef) quanto para itens
+     personalizados criados pelo sistema "Adicionar" já existente do
+     Inventário (item.nome, sem eqRef).
      ========================================================== */
 
   function ensureItensSection(){
@@ -266,7 +304,7 @@
     wrap.id = "eqinv_itens_wrap";
     wrap.className = "eqinv-itens-wrap";
     wrap.innerHTML =
-      '<div class="eqinv-itens-label">Equipamentos do Inventário</div>' +
+      '<div class="eqinv-itens-label">Itens do Inventário</div>' +
       '<div id="eqinv_itens_list" class="eqinv-itens-list"></div>';
     textarea.insertAdjacentElement("afterend", wrap);
   }
@@ -276,32 +314,144 @@
     var list = document.getElementById("eqinv_itens_list");
     if (!list) return;
 
-    var refs = (typeof invItems !== "undefined")
-      ? invItems.filter(function(it){ return it && it.eqRef; })
-      : [];
+    var items = (typeof invItems !== "undefined") ? invItems : [];
 
-    if (refs.length === 0){
-      list.innerHTML = '<div class="empty-state">Nenhum equipamento no Inventário ainda.</div>';
+    if (items.length === 0){
+      list.innerHTML = '<div class="empty-state">Nenhum item no Inventário ainda.</div>';
       return;
     }
 
     list.innerHTML = "";
-    refs.forEach(function(item){
-      var eqIt = (window.Equipamentos && typeof window.Equipamentos.findItemById === "function")
-        ? window.Equipamentos.findItemById(item.eqRef) : null;
+    items.forEach(function(item){
+      if (!item) return;
       var chip = document.createElement("button");
       chip.type = "button";
       chip.className = "eqinv-item-chip";
-      if (eqIt){
-        chip.textContent = eqIt.nome;
-        chip.addEventListener("click", function(){ window.Equipamentos.openItemModal(item.eqRef); });
+
+      if (item.eqRef){
+        var eqIt = (window.Equipamentos && typeof window.Equipamentos.findItemById === "function")
+          ? window.Equipamentos.findItemById(item.eqRef) : null;
+        if (eqIt){
+          chip.textContent = eqIt.nome;
+          chip.addEventListener("click", function(){ window.Equipamentos.openItemModal(item.eqRef); });
+        } else {
+          chip.textContent = "Equipamento não encontrado";
+          chip.classList.add("eqinv-item-chip-missing");
+          chip.disabled = true;
+        }
+      } else if (item.nome){
+        chip.textContent = item.nome;
+        chip.addEventListener("click", function(){ openCustomItemModal(item); });
       } else {
-        chip.textContent = "Equipamento não encontrado";
-        chip.classList.add("eqinv-item-chip-missing");
-        chip.disabled = true;
+        return;
       }
+
       list.appendChild(chip);
     });
+  }
+
+  /* ==========================================================
+     POPUP DO ITEM PERSONALIZADO
+     Reaproveita a MESMA estrutura genérica de modal
+     (".modal-overlay"/".modal-box"/".cx-modal-box"/
+     ".cx-modal-section"/".modal-actions") já usada por todos os
+     outros popups do projeto — nenhum sistema de popup novo é
+     criado. Só é usada para itens do Inventário que NÃO vieram do
+     Compêndio (sem eqRef): equipamentos com eqRef continuam abrindo
+     window.Equipamentos.openItemModal(), como já acontecia.
+     ========================================================== */
+
+  function ensureCustomItemModal(){
+    if (document.getElementById("eqinv_custom_modal")) return;
+    var overlay = document.createElement("div");
+    overlay.className = "modal-overlay";
+    overlay.id = "eqinv_custom_modal";
+    overlay.innerHTML =
+      '<div class="modal-box cx-modal-box eqinv-custom-modal-box">' +
+        '<h3 id="eqinv_custom_modal_title"></h3>' +
+        '<div class="cx-modal-section" id="eqinv_custom_modal_stats"></div>' +
+        '<div class="cx-modal-section" id="eqinv_custom_modal_desc_wrap" style="display:none;"><p id="eqinv_custom_modal_desc" style="white-space:pre-wrap;"></p></div>' +
+        '<div class="modal-actions" style="margin-top:14px; justify-content:flex-end;">' +
+          '<button type="button" id="eqinv_custom_modal_close">Fechar</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    document.getElementById("eqinv_custom_modal_close").addEventListener("click", closeCustomItemModal);
+    overlay.addEventListener("click", function(e){
+      if (e.target.id === "eqinv_custom_modal") closeCustomItemModal();
+    });
+  }
+
+  function openCustomItemModal(item){
+    ensureCustomItemModal();
+    document.getElementById("eqinv_custom_modal_title").textContent = item.nome || "Item";
+
+    var statsHtml = "";
+    if (item.qtd) statsHtml += '<p><strong>Quantidade:</strong> ' + esc(item.qtd) + '</p>';
+    if (item.peso) statsHtml += '<p><strong>Peso:</strong> ' + esc(item.peso) + ' kg</p>';
+    document.getElementById("eqinv_custom_modal_stats").innerHTML = statsHtml;
+
+    var descWrap = document.getElementById("eqinv_custom_modal_desc_wrap");
+    if (item.desc){
+      document.getElementById("eqinv_custom_modal_desc").textContent = item.desc;
+      descWrap.style.display = "";
+    } else {
+      descWrap.style.display = "none";
+    }
+
+    document.getElementById("eqinv_custom_modal").style.display = "flex";
+  }
+
+  function closeCustomItemModal(){
+    var m = document.getElementById("eqinv_custom_modal");
+    if (m) m.style.display = "none";
+  }
+
+  /* ==========================================================
+     PESO TOTAL (AGENTES → ITENS DO AGENTE) — SOMA AUTOMÁTICA
+     Reaproveita o MESMO campo #peso_total já existente (não cria
+     campo novo) e o MESMO invItems do Inventário — nunca é
+     armazenado à parte: é recalculado sempre que o Inventário é
+     renderizado (ver wrapRenderInventory) e o valor em tela é
+     apenas o resultado dessa soma, nunca um dado independente.
+     ========================================================== */
+
+  // Peso de um único item do Inventário. Segue a MESMA regra já
+  // usada pelo Inventário (#inv_peso_total) para itens manuais
+  // (peso × qtd); para equipamentos do Compêndio, usa o peso já
+  // cadastrado em EQUIPAMENTOS_DATA (cada referência em invItems já
+  // representa uma unidade — duplicar o mesmo equipamento na ficha
+  // significa duplicar a entrada no array, não uma "qtd" maior).
+  // Nunca retorna NaN/undefined: qualquer peso ausente ou inválido
+  // (texto não numérico, campo vazio, equipamento não encontrado)
+  // conta como 0, sem gerar erro no console.
+  function pesoDoItem(item){
+    if (!item) return 0;
+    if (item.eqRef){
+      var eqIt = (window.Equipamentos && typeof window.Equipamentos.findItemById === "function")
+        ? window.Equipamentos.findItemById(item.eqRef) : null;
+      var p = eqIt ? parseFloat(eqIt.peso) : NaN;
+      return isNaN(p) ? 0 : p;
+    }
+    var peso = parseFloat(item.peso);
+    var qtd = parseInt(item.qtd, 10);
+    return (isNaN(peso) ? 0 : peso) * (isNaN(qtd) ? 1 : qtd);
+  }
+
+  function recomputePesoTotalAgente(){
+    var el = document.getElementById("peso_total");
+    if (!el) return;
+    var items = (typeof invItems !== "undefined") ? invItems : [];
+    var total = items.reduce(function(sum, item){ return sum + pesoDoItem(item); }, 0);
+    el.value = total.toFixed(1);
+  }
+
+  // O usuário não deve mais digitar este campo à mão (instrução 13
+  // do pedido) — deixado somente leitura em runtime, sem alterar o
+  // atributo no HTML.
+  function ensurePesoTotalReadOnly(){
+    var el = document.getElementById("peso_total");
+    if (el) el.readOnly = true;
   }
 
   // Envolve renderInventory() (já existente, global) para reconstruir
@@ -315,6 +465,7 @@
     renderInventory = function(){
       _origRenderInventory();
       renderItensFromInventory();
+      recomputePesoTotalAgente();
     };
   }
 
@@ -323,8 +474,10 @@
     var btn = document.getElementById("eqinv_add_btn");
     if (btn) btn.addEventListener("click", openPickerModal);
     ensureItensSection();
+    ensurePesoTotalReadOnly();
     wrapRenderInventory();
     renderItensFromInventory();
+    recomputePesoTotalAgente();
   }
 
   if (document.readyState === "loading"){
