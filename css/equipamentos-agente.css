@@ -179,3 +179,8 @@
   border-color:var(--line);
   color:var(--sigil);
 }
+
+/* ---------- popup do item personalizado (sem equivalente no Compêndio) ---------- */
+.eqinv-custom-modal-box{
+  max-width:420px;
+}
