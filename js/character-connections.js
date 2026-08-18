@@ -865,4 +865,18 @@
     initCharacterConnections();
   }
 
+  // ---------------------------------------------------------
+  // API pública mínima — só para permitir que outros sistemas já
+  // existentes (ex.: Pontos de Restauração da Ficha, em index.html)
+  // peçam um redesenho do painel de Conexões depois de alterar o
+  // campo oculto #agente_conexoes_ids por fora (ex.: restaurando um
+  // backup). NÃO cria nenhum armazenamento novo nem muda o
+  // comportamento de renderAll()/renderMinhasConexoes()/
+  // renderAgenteConexoes() — apenas expõe o que já existia como
+  // função privada do módulo.
+  // ---------------------------------------------------------
+  window.CharacterConnections = {
+    refresh: renderAll
+  };
+
 })();
