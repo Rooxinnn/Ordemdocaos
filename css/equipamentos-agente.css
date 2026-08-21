@@ -151,6 +151,27 @@
   flex-wrap:wrap;
   gap:8px;
 }
+.eqinv-item-row{
+  display:flex;
+  align-items:center;
+  gap:4px;
+}
+.eqinv-item-minus{
+  flex:0 0 auto;
+  background:transparent;
+  border:1px solid var(--line);
+  color:var(--sigil);
+  width:24px;
+  height:24px;
+  line-height:1;
+  padding:0;
+  font-size:14px;
+  cursor:pointer;
+}
+.eqinv-item-minus:hover{
+  color:#e06060;
+  border-color:#e06060;
+}
 .eqinv-item-chip{
   background:var(--panel-2);
   border:1px solid var(--line);
