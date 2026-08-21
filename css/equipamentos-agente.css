@@ -180,6 +180,32 @@
   color:var(--sigil);
 }
 
+/* ---------- popup "Quantos deseja adicionar?" ----------
+   Aberto ao clicar "Adicionar" numa linha do picker — reaproveita a
+   MESMA estrutura genérica de modal/campo do projeto (".modal-box"/
+   ".field"/".modal-actions", já estilizadas globalmente); só o
+   tamanho da caixa e o texto do item são específicos daqui. Não
+   altera em nada o layout do Compêndio nem da lista do picker. */
+.eqinv-qty-modal-box{
+  max-width:360px;
+}
+.eqinv-qty-modal-box .eqinv-qty-item-name{
+  margin:-8px 0 2px;
+  font-family:'Oswald', sans-serif;
+  font-size:12.5px;
+  text-transform:uppercase;
+  letter-spacing:0.04em;
+  color:var(--amber-bright);
+}
+.eqinv-qty-modal-box .eqinv-qty-question{
+  margin:0 0 16px;
+  font-size:12.5px;
+  color:var(--paper-dim);
+}
+.eqinv-qty-modal-box input#eqinv_qty_modal_input{
+  text-align:center;
+}
+
 /* ---------- popup do item personalizado (sem equivalente no Compêndio) ---------- */
 .eqinv-custom-modal-box{
   max-width:420px;
