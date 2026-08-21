@@ -72,9 +72,13 @@
    Inventário: um card clicável para cada referência ("eqRef")
    presente em invItems — a MESMA fonte de dados já usada pelo
    Inventário, sem nenhum array/armazenamento paralelo. Não existe
-   "adicionar"/"remover" nesta área: qualquer alteração só é feita
-   pelo Inventário (instrução 8 do pedido), e a área aqui é só um
-   espelho dele.
+   "adicionar" nesta área: isso só é feito pelo Inventário (instrução
+   8 do pedido original). "Remover" (por completo) também continua
+   sendo feito pelo Inventário — mas esta área ganhou um pequeno botão
+   "−" próprio, ao lado de cada chip de equipamento do Compêndio, para
+   USAR/GASTAR uma unidade sem precisar trocar de aba (pedido
+   posterior, específico da aba Agentes); ao chegar a 0, a entrada é
+   removida (ver decreaseAgenteItemQty()), pelo MESMO invItems.
 
    Sincronização: como TODOS os pontos do projeto que alteram
    invItems (adicionar, remover, carregar ficha, importar JSON, nova
@@ -453,11 +457,14 @@
     }
 
     list.innerHTML = "";
-    items.forEach(function(item){
+    items.forEach(function(item, idx){
       if (!item) return;
       var chip = document.createElement("button");
       chip.type = "button";
       chip.className = "eqinv-item-chip";
+
+      var row = document.createElement("div");
+      row.className = "eqinv-item-row";
 
       if (item.eqRef){
         var eqIt = (window.Equipamentos && typeof window.Equipamentos.findItemById === "function")
@@ -467,6 +474,26 @@
           if (isNaN(chipQtd) || chipQtd < 1) chipQtd = 1;
           chip.textContent = (chipQtd > 1 ? chipQtd + "× " : "") + eqIt.nome;
           chip.addEventListener("click", function(){ window.Equipamentos.openItemModal(item.eqRef); });
+
+          // Botão "usar/gastar uma unidade": diminui a quantidade sem
+          // precisar abrir o Inventário — pedido explícito para a aba
+          // Agentes. Ao chegar a 0, a entrada é removida (item gasto),
+          // pelo MESMO invItems/saveInventory() já usados por tudo o
+          // resto (ver decreaseAgenteItemQty()).
+          var minusBtn = document.createElement("button");
+          minusBtn.type = "button";
+          minusBtn.className = "eqinv-item-minus";
+          minusBtn.textContent = "\u2212";
+          minusBtn.setAttribute("aria-label", "Usar uma unidade de " + eqIt.nome);
+          minusBtn.setAttribute("title", "Usar 1 unidade");
+          minusBtn.addEventListener("click", function(e){
+            e.stopPropagation();
+            decreaseAgenteItemQty(idx);
+          });
+          row.appendChild(chip);
+          row.appendChild(minusBtn);
+          list.appendChild(row);
+          return;
         } else {
           chip.textContent = "Equipamento não encontrado";
           chip.classList.add("eqinv-item-chip-missing");
@@ -479,8 +506,37 @@
         return;
       }
 
-      list.appendChild(chip);
+      row.appendChild(chip);
+      list.appendChild(row);
     });
+  }
+
+  // Diminui em 1 a quantidade de um equipamento do Compêndio (eqRef)
+  // já na ficha — usado pelo botão "−" ao lado do chip, na aba
+  // Agentes ("Itens do Agente"), para o caso de o item ser gasto em
+  // jogo. Item antigo sem "qtd" registrada é tratado como já tendo 1
+  // unidade (instrução de compatibilidade do pedido de quantidade).
+  // Ao chegar a 0, a entrada é removida do invItems (mesmo
+  // comportamento do botão "Remover" já existente no Inventário) —
+  // continua sendo o MESMO invItems/saveInventory(), nenhum
+  // armazenamento novo.
+  function decreaseAgenteItemQty(idx){
+    if (typeof invItems === "undefined") return;
+    var item = invItems[idx];
+    if (!item || !item.eqRef) return;
+
+    var qtd = parseInt(item.qtd, 10);
+    if (isNaN(qtd) || qtd < 1) qtd = 1;
+    qtd -= 1;
+
+    if (qtd < 1){
+      invItems.splice(idx, 1);
+    } else {
+      item.qtd = qtd;
+    }
+
+    if (typeof renderInventory === "function") renderInventory();
+    if (typeof saveInventory === "function") saveInventory();
   }
 
   /* ==========================================================
