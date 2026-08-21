@@ -43,8 +43,10 @@
      2) o modal de seleção, que lista/filtra/pesquisa os
         equipamentos existentes em EQUIPAMENTOS_DATA (via
         window.Equipamentos.data/catOrder/catLabels — nenhuma
-        segunda lista é criada) e adiciona a referência escolhida
-        ao invItems da ficha aberta.
+        segunda lista é criada) e, ao clicar "Adicionar" numa linha,
+        abre um pequeno popup de quantidade (ver ETAPA 5 abaixo) que
+        só então adiciona a referência escolhida ao invItems da
+        ficha aberta.
 
    Os filtros deste modal são construídos dinamicamente a partir de
    window.Equipamentos.catOrder/catLabels — se novas categorias
@@ -107,6 +109,43 @@
    que o próprio item já tem (nome/qtd/peso/desc) — nenhum dado novo,
    nenhuma segunda biblioteca.
 
+   ----------------------------------------------------------
+   ETAPA 5 — QUANTIDADE NOS EQUIPAMENTOS DO COMPÊNDIO (eqRef)
+   ----------------------------------------------------------
+   Cada referência ("eqRef") em invItems passa a poder ter também um
+   campo "qtd" (mesmo nome de campo já usado pelos itens manuais do
+   Inventário — nenhum campo novo é inventado): { eqRef: "...", qtd: N }.
+   Continua sendo o MESMO invItems, salvo pelo MESMO saveInventory() —
+   nenhum armazenamento novo. Equipamentos já existentes em fichas
+   antigas (sem "qtd") são sempre tratados como qtd = 1 em todo lugar
+   que lê esse campo aqui (nunca é preciso recriá-los).
+
+   A quantidade é perguntada só no momento de ADICIONAR à ficha — nunca
+   dentro do Compêndio, nem dentro da lista do modal "Adicionar
+   Equipamento" (#eqinv_picker_list), que continuam com exatamente o
+   mesmo layout de sempre (mesmas linhas, mesmo botão "Adicionar",
+   nada de campo extra ali). Ao clicar "Adicionar" numa linha, um
+   pequeno popup próprio (#eqinv_qty_modal, ver openQtyPopup()) — na
+   MESMA estrutura genérica de modal do projeto — pergunta "Quantas
+   unidades deseja adicionar?"; só ao confirmar é que
+   addEquipmentToSheet() roda. Cancelar não adiciona nada.
+
+   Como a criação visual dos cards do Inventário (#inv_list) é feita
+   por renderInventory(), já existente em index.html, e essa etapa
+   pediu para não tocar nesse arquivo, a exibição de "N× Nome" é
+   ACRESCENTADA aqui, depois que renderInventory() original já rodou
+   (mesmo mecanismo de "envolver" renderInventory() já usado acima, na
+   Etapa 3/4) — só o texto do título é alterado (prefixo "N× " quando
+   a quantidade é maior que 1; quando é 1, o título fica exatamente
+   como sempre foi), nenhum bloco/controle novo é somado ao card,
+   nenhuma estrutura ou espaçamento dele é tocado. Pelo mesmo motivo,
+   o total nativo #inv_peso_total (calculado dentro de renderInventory()
+   em index.html) não sabe multiplicar o peso de um eqRef pela sua
+   "qtd" — por isso este módulo, no mesmo passo, sobrescreve esse MESMO
+   campo já existente com o total correto, reaproveitando a função
+   pesoDoItem() já usada mais abaixo para o Peso Total de "Itens do
+   Agente" (nenhuma segunda fórmula é criada).
+
    Peso Total (#peso_total, painel "Itens do Agente"): já existia
    como campo numérico digitado à mão. Passa a ser somado
    automaticamente a partir do MESMO invItems (peso de cada
@@ -126,6 +165,7 @@
   "use strict";
 
   var pickerActiveFilter = "todas";
+  var pendingQtyItemId = null;
 
   function esc(s){
     if (typeof escapeHtml === "function") return escapeHtml(s);
@@ -136,12 +176,32 @@
 
   /* ---------- adicionar/renderizar reaproveitando o Inventário já existente ---------- */
 
-  // Adiciona SEMPRE uma nova referência (permite o mesmo equipamento
-  // várias vezes na ficha — instrução 11: não há checagem de
-  // duplicidade aqui, cada clique em "Adicionar" soma mais um item).
-  function addEquipmentToSheet(id){
+  // Adiciona "qtd" unidades do equipamento à ficha. Se este mesmo
+  // equipamento (mesmo eqRef) já existir no Inventário, soma a
+  // quantidade à entrada existente em vez de criar outra (agrupamento),
+  // sem alterar a lógica de identificação já existente (continua sendo
+  // pelo mesmo eqRef); só quando não existir ainda é que uma entrada
+  // nova é criada. Equipamento antigo já na ficha sem "qtd" registrada
+  // é tratado como já tendo 1 unidade antes de somar.
+  function addEquipmentToSheet(id, qtd){
     if (typeof invItems === "undefined") return;
-    invItems.push({ eqRef: id });
+
+    var addQtd = parseInt(qtd, 10);
+    if (isNaN(addQtd) || addQtd < 1) addQtd = 1;
+
+    var existing = null;
+    for (var i = 0; i < invItems.length; i++){
+      if (invItems[i] && invItems[i].eqRef === id){ existing = invItems[i]; break; }
+    }
+
+    if (existing){
+      var atual = parseInt(existing.qtd, 10);
+      if (isNaN(atual) || atual < 1) atual = 1;
+      existing.qtd = atual + addQtd;
+    } else {
+      invItems.push({ eqRef: id, qtd: addQtd });
+    }
+
     if (typeof renderInventory === "function") renderInventory();
     if (typeof saveInventory === "function") saveInventory();
   }
@@ -246,7 +306,7 @@
 
       row.querySelector(".eqinv-picker-add-btn").addEventListener("click", function(e){
         e.stopPropagation();
-        addEquipmentToSheet(it.id);
+        openQtyPopup(it);
       });
 
       list.appendChild(row);
@@ -273,6 +333,77 @@
   function closePickerModal(){
     var m = document.getElementById("eqinv_picker_modal");
     if (m) m.style.display = "none";
+  }
+
+  /* ==========================================================
+     POPUP "QUANTOS DESEJA ADICIONAR?"
+     Aberto ao clicar em "Adicionar" numa linha do picker — a
+     quantidade é perguntada AQUI, na ação de adicionar à ficha, e
+     não dentro do Compêndio nem dentro da lista do picker (que
+     continua com exatamente o mesmo layout de antes da quantidade
+     existir). Reaproveita a MESMA estrutura genérica de modal
+     (".modal-overlay"/".modal-box"/".modal-actions"/".field") já
+     usada por todo o projeto — nenhum sistema de popup novo é
+     criado, nenhuma classe de layout do Compêndio/picker é tocada.
+     ========================================================== */
+
+  function ensureQtyModal(){
+    if (document.getElementById("eqinv_qty_modal")) return;
+    var overlay = document.createElement("div");
+    overlay.className = "modal-overlay";
+    overlay.id = "eqinv_qty_modal";
+    overlay.innerHTML =
+      '<div class="modal-box eqinv-qty-modal-box">' +
+        '<h3>Adicionar Equipamento</h3>' +
+        '<p class="eqinv-qty-item-name" id="eqinv_qty_modal_name"></p>' +
+        '<p class="eqinv-qty-question">Quantas unidades deseja adicionar?</p>' +
+        '<div class="field"><label>Quantidade</label><input type="number" id="eqinv_qty_modal_input" min="1" step="1" value="1"></div>' +
+        '<div class="modal-actions" style="margin-top:16px;">' +
+          '<button type="button" id="eqinv_qty_modal_cancel">Cancelar</button>' +
+          '<button type="button" id="eqinv_qty_modal_confirm">Adicionar</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+
+    document.getElementById("eqinv_qty_modal_cancel").addEventListener("click", closeQtyPopup);
+    overlay.addEventListener("click", function(e){
+      if (e.target.id === "eqinv_qty_modal") closeQtyPopup();
+    });
+    document.getElementById("eqinv_qty_modal_confirm").addEventListener("click", function(){
+      var input = document.getElementById("eqinv_qty_modal_input");
+      var qtd = parseInt(input.value, 10);
+      if (isNaN(qtd) || qtd < 1) qtd = 1;
+      if (pendingQtyItemId) addEquipmentToSheet(pendingQtyItemId, qtd);
+      closeQtyPopup();
+    });
+  }
+
+  // Abre o popup de quantidade para o item "it" (do Compêndio) e, ao
+  // mesmo tempo, esconde o modal "Adicionar Equipamento" por trás
+  // dele (sem fechá-lo/destruí-lo — closeQtyPopup() o traz de volta,
+  // com a lista/filtro/pesquisa exatamente como estavam).
+  function openQtyPopup(it){
+    ensureQtyModal();
+    pendingQtyItemId = it.id;
+    document.getElementById("eqinv_qty_modal_name").textContent = it.nome;
+    var input = document.getElementById("eqinv_qty_modal_input");
+    input.value = "1";
+    var pickerModal = document.getElementById("eqinv_picker_modal");
+    if (pickerModal) pickerModal.style.display = "none";
+    document.getElementById("eqinv_qty_modal").style.display = "flex";
+    input.focus();
+  }
+
+  // Fecha o popup de quantidade (usado tanto por "Cancelar" quanto
+  // depois de confirmar "Adicionar") e volta a mostrar o modal
+  // "Adicionar Equipamento", para o usuário poder somar mais itens
+  // sem precisar reabrir tudo do zero.
+  function closeQtyPopup(){
+    var m = document.getElementById("eqinv_qty_modal");
+    if (m) m.style.display = "none";
+    pendingQtyItemId = null;
+    var pickerModal = document.getElementById("eqinv_picker_modal");
+    if (pickerModal) pickerModal.style.display = "flex";
   }
 
   // Reaproveita currentAgentId (já existente/global) só para avisar
@@ -332,7 +463,9 @@
         var eqIt = (window.Equipamentos && typeof window.Equipamentos.findItemById === "function")
           ? window.Equipamentos.findItemById(item.eqRef) : null;
         if (eqIt){
-          chip.textContent = eqIt.nome;
+          var chipQtd = parseInt(item.qtd, 10);
+          if (isNaN(chipQtd) || chipQtd < 1) chipQtd = 1;
+          chip.textContent = (chipQtd > 1 ? chipQtd + "× " : "") + eqIt.nome;
           chip.addEventListener("click", function(){ window.Equipamentos.openItemModal(item.eqRef); });
         } else {
           chip.textContent = "Equipamento não encontrado";
@@ -419,23 +552,80 @@
   // Peso de um único item do Inventário. Segue a MESMA regra já
   // usada pelo Inventário (#inv_peso_total) para itens manuais
   // (peso × qtd); para equipamentos do Compêndio, usa o peso já
-  // cadastrado em EQUIPAMENTOS_DATA (cada referência em invItems já
-  // representa uma unidade — duplicar o mesmo equipamento na ficha
-  // significa duplicar a entrada no array, não uma "qtd" maior).
-  // Nunca retorna NaN/undefined: qualquer peso ausente ou inválido
-  // (texto não numérico, campo vazio, equipamento não encontrado)
-  // conta como 0, sem gerar erro no console.
+  // cadastrado em EQUIPAMENTOS_DATA (peso individual) multiplicado
+  // pela "qtd" já guardada na própria referência em invItems (item
+  // antigo sem "qtd" registrada conta como 1 unidade — instrução 5
+  // do pedido de quantidade). Nunca retorna NaN/undefined: qualquer
+  // peso ou quantidade ausente/inválida (texto não numérico, campo
+  // vazio, equipamento não encontrado) conta como 0/1, sem gerar
+  // erro no console.
   function pesoDoItem(item){
     if (!item) return 0;
     if (item.eqRef){
       var eqIt = (window.Equipamentos && typeof window.Equipamentos.findItemById === "function")
         ? window.Equipamentos.findItemById(item.eqRef) : null;
       var p = eqIt ? parseFloat(eqIt.peso) : NaN;
-      return isNaN(p) ? 0 : p;
+      var unit = isNaN(p) ? 0 : p;
+      var eqQtd = parseInt(item.qtd, 10);
+      if (isNaN(eqQtd) || eqQtd < 1) eqQtd = 1;
+      return unit * eqQtd;
     }
     var peso = parseFloat(item.peso);
     var qtd = parseInt(item.qtd, 10);
     return (isNaN(peso) ? 0 : peso) * (isNaN(qtd) ? 1 : qtd);
+  }
+
+  /* ==========================================================
+     QUANTIDADE — CARDS DO INVENTÁRIO (#inv_list, index.html)
+     renderInventory() (index.html) cria um card por posição de
+     invItems, na mesma ordem do array, sem filtrar nada — por isso
+     list.children[idx] corresponde exatamente a invItems[idx].
+     Aproveitando essa correspondência, localizamos aqui o card de
+     cada eqRef já pronto (pelo índice) e só ACRESCENTAMOS o prefixo
+     "N× " ao texto do título já existente — nada de bloco/controle
+     novo dentro do card (a quantidade só se altera pelo popup, ao
+     adicionar mais unidades — ver ETAPA 5 acima), nem estrutura,
+     nem espaçamento do card é tocado; quando a quantidade é 1, o
+     título permanece exatamente como sempre foi (instrução 5 do
+     pedido de quantidade). Itens manuais (sem eqRef, que já têm seu
+     próprio "x{qtd}" desenhado por index.html) não são tocados aqui.
+     ========================================================== */
+
+  function enhanceInventoryQtyDisplay(){
+    var list = document.getElementById("inv_list");
+    if (!list || typeof invItems === "undefined") return;
+
+    invItems.forEach(function(item, idx){
+      if (!item || !item.eqRef) return;
+      var card = list.children[idx];
+      if (!card) return;
+      var titleEl = card.querySelector(".eqinv-title");
+      if (!titleEl) return; // "Equipamento não encontrado": nada a acrescentar
+
+      var qtd = parseInt(item.qtd, 10);
+      if (isNaN(qtd) || qtd < 1) qtd = 1;
+
+      if (qtd > 1) titleEl.textContent = qtd + "× " + titleEl.textContent;
+    });
+
+    recomputeInvPesoTotal();
+  }
+
+  /* ---------- PESO TOTAL (#inv_peso_total, painel Inventário) ----------
+     renderInventory() (index.html) já calcula esse MESMO campo, mas só
+     soma peso×qtd dos itens manuais (item.peso/item.qtd); equipamentos
+     do Compêndio (eqRef) não têm esses campos guardados na própria
+     referência (o peso mora em EQUIPAMENTOS_DATA), então entravam nessa
+     soma nativa como 0. Sem alterar index.html, aqui sobrescrevemos o
+     MESMO campo já existente com o total correto (peso individual ×
+     quantidade, para os dois tipos de item), reaproveitando pesoDoItem()
+     — a mesma função já usada logo abaixo para o Peso Total de "Itens do
+     Agente" — para não duplicar a fórmula. */
+  function recomputeInvPesoTotal(){
+    var el = document.getElementById("inv_peso_total");
+    if (!el || typeof invItems === "undefined") return;
+    var total = invItems.reduce(function(sum, item){ return sum + pesoDoItem(item); }, 0);
+    el.value = total.toFixed(1);
   }
 
   function recomputePesoTotalAgente(){
@@ -464,6 +654,7 @@
     var _origRenderInventory = renderInventory;
     renderInventory = function(){
       _origRenderInventory();
+      enhanceInventoryQtyDisplay();
       renderItensFromInventory();
       recomputePesoTotalAgente();
     };
@@ -476,6 +667,7 @@
     ensureItensSection();
     ensurePesoTotalReadOnly();
     wrapRenderInventory();
+    enhanceInventoryQtyDisplay();
     renderItensFromInventory();
     recomputePesoTotalAgente();
   }
